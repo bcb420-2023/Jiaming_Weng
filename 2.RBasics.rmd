@@ -1,0 +1,106 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+# 1.12.1 Exercise
+```{r}
+library()
+search()
+?vignette
+```
+
+```{r}
+# to get help on using install.packages
+?install.packages
+
+# Note: the parameter is a quoted string!
+# install.packages("seqinr",repos="https://cran.rstudio.com/")   
+library(help="seqinr") 
+library(seqinr)
+ls("package:seqinr")
+```
+
+```{r}
+?seqinr::a # Converts amino-acid three-letter code into the one-letter one
+seqinr::a("Tyr")
+seqinr::words(3, c("A", "G", "C", "U"))
+```
+ [1] "AAA" "AAG" "AAC" "AAU" "AGA" "AGG" "AGC" "AGU" "ACA" "ACG" "ACC"
+[12] "ACU" "AUA" "AUG" "AUC" "AUU" "GAA" "GAG" "GAC" "GAU" "GGA" "GGG"
+[23] "GGC" "GGU" "GCA" "GCG" "GCC" "GCU" "GUA" "GUG" "GUC" "GUU" "CAA"
+[34] "CAG" "CAC" "CAU" "CGA" "CGG" "CGC" "CGU" "CCA" "CCG" "CCC" "CCU"
+[45] "CUA" "CUG" "CUC" "CUU" "UAA" "UAG" "UAC" "UAU" "UGA" "UGG" "UGC"
+[56] "UGU" "UCA" "UCG" "UCC" "UCU" "UUA" "UUG" "UUC" "UUU"
+```{r}
+aaindex$FASG890101 
+aaindex$PONJ960101 
+```
+```{r}
+?data # load dataset
+data(aaindex, package="seqinr")   
+?aaindex
+aaindex$FASG890101 
+```
+```{r}
+
+```
+
+plot
+```{r}
+plot(aaindex$FASG890101$I,
+     aaindex$PONJ960101$I,
+     xlab="hydrophobicity", ylab="volume", type="n")
+text(aaindex$FASG890101$I,
+     aaindex$PONJ960101$I,
+     labels=a(names(aaindex$FASG890101$I)))
+```
+```{r}
+seqinr::choosebank("swissprot")
+mySeq <- seqinr::query("mySeq", "N=MBP1_YEAST")
+mbp1 <- seqinr::getSequence(mySeq)
+seqinr::closebank()
+x <- seqinr::AAstat(mbp1[[1]])
+barplot(sort(x$Compo), cex.names = 0.6)
+```
+equivalent preload
+```{r}
+library(seqinr)
+choosebank("swissprot")
+mySeq <- query("mySeq", "N=MBP1_YEAST")
+mbp1 <- getSequence(mySeq)
+closebank()
+x <- AAstat(mbp1[[1]])
+barplot(sort(x$Compo), cex.names = 0.6)
+```
+```{r}
+library(help = seqinr)       # basic information
+browseVignettes("seqinr")    # available vignettes
+data(package = "seqinr")     # available datasets
+```
+
+```{r}
+if (! requireNamespace("sos", quietly=TRUE)) {
+    install.packages("sos")
+}
+library(help = sos)       # basic information
+browseVignettes("sos")    # available vignettes
+ 
+sos::findFn("moving average")
+```
+
+```{r}
+a <- 3
+b <- 4
+c <- sqrt(a^2 +b^2)
+ls()
+save(a, file = "tmp.RData")
+rm(a)
+ls()
+load("tmp.RData")
+ls()
+rm(list=setdiff(ls(), "task_counter"))
+ls()
+```
+
