@@ -1,0 +1,379 @@
+---
+title: "Assignment 1: Data set selection and initial Processing."
+author: Jiaming Weng
+date: "r Sys.Date()"
+output: 
+  html_document:
+    toc: true
+bibliography: Assignment1.bib
+---
+
+<style type="text/css">
+  body{
+  font-size: 12pt;
+}
+</style>
+
+## Introduction
+
+### Overview
+- Aged hematopoietic stem cells (HSC) display functional decline and associated with an increased risk of myeloid malignancies. Studies in Aged murine HSCs suggesting that epigenetic shifts with age may contribute to HSC loss of function [@beerman2013proliferation], and human histone modification levels has been profiled [@cheung2018single], but detailed human studies of aged human HSCs are still lacking. 
+To investigate the genomic mechanism of the epigenetic differences we observed in aged HSCe, we performed an analysis of RNA-sequencing (RNA-seq) profiles of young and aged Lineage−CD34+CD38− cells [HSC-enriched (HSCe)] .
+
+### Data and Experimental Conditions
+
+- We have selected the GEO dataset with the accession number [GSE104406](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE104406) for further analysis.
+The original publication is [Aging Human Hematopoietic Stem Cells Manifest Profound Epigenetic Reprogramming of Enhancers That May Predispose to Leukemia (RNA-Seq of HSCe)](https://doi.org/10.1158/2159-8290.CD-18-1474) [@adelman_aging_2019]
+
+- It contains RNA-seq data from human bone marrow-derived hematopoietic stem cells (HSCs) from young (18-30 years old) and aged (65-75 years old) donors with no known hematological malignancy. We used the 10 biological replicates from the young donors as our control group and the 10 biological replicates from the aged donors as the experimental group.
+
+## Data Selection and Cleaning
+
+- We import the packages required for our analysis.
+
+### Dependencies
+```{r, message = FALSE, warning=FALSE}
+if (! requireNamespace("BiocManager", quietly = TRUE)) {
+  install.packages("BiocManager")
+}
+
+if (! requireNamespace("limma", quietly = TRUE)) {
+  BiocManager::install("limma")
+}
+
+if (! requireNamespace("GEOquery", quietly = TRUE)) {
+  BiocManager::install("GEOquery")
+}
+
+if (! requireNamespace("knitr", quietly = TRUE)) {
+  install.packages("knitr")
+}
+
+if (! requireNamespace("dplyr", quietly = TRUE)) {
+  install.packages("dplyr")
+}
+
+if (! requireNamespace("edgeR", quietly = TRUE)) {
+  BiocManager::install("edgeR")
+}
+
+if (! requireNamespace("biomaRt", quietly = TRUE)) {
+  BiocManager::install("biomaRt")
+}
+
+library(Biobase)
+library(GEOquery)
+library(limma)
+library(knitr)
+library(edgeR)
+library(biomaRt)
+library(dplyr)  
+```
+
+
+### Data Exploration
+
+- We use the GEOquery Bioconductor package to retrieve the metadata and information.
+
+```{r, message = FALSE, warning=FALSE}
+gse <- getGEO("GSE104406",GSEMatrix=FALSE)
+current_gpl <- names(GPLList(gse))[1]
+current_gpl_info <- Meta(getGEO(current_gpl))
+```
+  - **Platform title** : `r current_gpl_info$title`
+  - **Submission data** : `r current_gpl_info$submission_date`
+  - **Last update data** : `r current_gpl_info$last_update_date`
+  - **Organism** : `r current_gpl_info$organism`
+  - **Number of GEO datasets that use this technology**: `r length(current_gpl_info$series_id)`  
+  - **Number of GEO samples that use this technology**: `r length(current_gpl_info$sample_id)`
+
+- We then procure the raw counts in the supplementary files and map the filenames to the sample.
+```{r, message = FALSE, warning=FALSE}
+sfiles <- getGEOSuppFiles("GSE104406")
+fnames <- rownames(sfiles)
+
+gset <- getGEO("GSE104406",GSEMatrix=T)
+sample_info <- pData(gset[[1]])
+
+untar(fnames[2], exdir = "./GSE104406")
+raw_fnames <- untar(fnames[2],list=TRUE)
+
+# get the working directory for sorting data
+wd <- paste0(getwd(),"/GSE104406/")
+```
+
+
+### Data Preperation
+
+- We merge all raw count txt files into one dataframe to facilitate our future analysis.
+
+```{r}
+col_names <- c("Ensembl_ID")
+gender <- c()
+for (i in seq_along(raw_fnames)){
+  # convert GSM to sample name
+  col_names[i+1] <- gsub("_RNA", "", 
+                         sample_info[unlist(strsplit(raw_fnames[i], split = "\\_"))[1],1])
+  gender[i] <- 
+    sample_info[unlist(strsplit(raw_fnames[i], split = "\\_"))[1],ncol(sample_info)]
+  
+  curr <- read.table(gzfile(paste0(wd, raw_fnames[i])),header=F)
+  if (i == 1){
+    raw_dat <- curr
+  }
+  else{
+    raw_dat <- cbind(raw_dat, curr[,2])
+  }
+}
+colnames(raw_dat) <- col_names
+dim(raw_dat)
+```
+
+- Now the dataframe raw_dat has `r length(raw_fnames)` samples and the first column `Ensembl_ID` as row identifiers.
+
+- We retrieve the sample matrix that contains our study design:
+  -  Each sample will have `age_group`, `patient`, and `age` attribute:
+    * `age_group` denotes the age group of the sample donor.
+    * `patient` is an unique id.
+    * For future analysis and identifying bulk effects,  `gender` information is also included, "M" for male and "F" for female.
+
+```{r}
+samples <- data.frame(lapply(colnames(raw_dat)[2:21], 
+        FUN=function(x){unlist(strsplit(x, 
+                        split = "\\_"))[c(1,2)]}))
+colnames(samples) <- colnames(raw_dat)[2:21]
+rownames(samples) <- c("age_group","patient")
+samples <- data.frame(t(samples))
+# add a factor gender
+samples <- cbind(samples, gender = gender)
+
+knitr::kable(head(samples), format = "html")
+```
+
+### Quality Control
+
+- First, we check the quality of our data, remove repetitive rows or unexpected values like NAs.
+
+```{r}
+# Check repititions
+summarized_gene_counts <- sort(table(raw_dat$Ensembl_ID),
+                               decreasing = TRUE)
+kable(summarized_gene_counts[1:3], format="html")
+
+# Check NA
+kable(tail(raw_dat), format="html")
+# removed, because it impaired cpm
+raw_dat <- raw_dat[-57256: -57260, ]
+kable(tail(raw_dat), format="html")
+```
+
+- Then, we filter out the weakly expressed genes according to edgeR
+  * We only keep features with at least 1 count per million in 10 of our samples, as by our study design,  each group has 10 replicates, any feature that didn't satisfied this requirement can be noise instead of our desired biological difference.
+
+```{r}
+# translate out counts into counts per million using the edgeR package function cpm
+cpms <- cpm(raw_dat[,2:21])
+rownames(cpms) <- raw_dat[,1]
+
+# filter low counts noise, comparing 10 samples to 10 samples
+keep <- rowSums(cpms >1) >=10
+HSCe_exp_filtered <- raw_dat[keep,]
+dim(HSCe_exp_filtered)
+summarized_gene_counts_filtered <- sort(table(HSCe_exp_filtered$Ensembl_ID),
+                               decreasing = TRUE)
+
+nrow(HSCe_exp_filtered)/nrow(raw_dat)
+```
+
+- We then further analyse the `r round(nrow(HSCe_exp_filtered)/nrow(raw_dat),3)` of the genes.
+
+## Normalization
+
+### TMM
+
+- We apply TMM(weighted trimmed mean of M-values) [@robinson2010edger] in the edgeR package to our dataset as it is one of the most the recommended normalization methods for RNAseq data based on count values, based on the hypothesis that most genes are not differentially expressed and our data is roughly balanced. Moreover, the data does not need to be modified or trimmed prior to normalization.
+
+```{r}
+filtered_data_matrix <- as.matrix(HSCe_exp_filtered[,2:21])
+rownames(filtered_data_matrix) <- HSCe_exp_filtered$Ensembl_ID
+d <- DGEList(counts=filtered_data_matrix, group=samples$age_group)
+d <- calcNormFactors(d)
+```
+
+### Pre- and Post- Normalization Comparison
+
+- We will comparing the post-normalization data with the our clean, pre-normalized data .
+```{r}
+# Pre-normalization
+pre_counts <- cpm(HSCe_exp_filtered[,2:21])
+
+# After-normalization
+normalized_counts <- cpm(d)
+rownames(normalized_counts) <- rownames(filtered_data_matrix)
+```
+
+**1. Distribution: Boxplot Plot**
+```{r, warning=F}
+boxplot_cpm <- function(cpm_dat, color ="pink", cap){
+  data2plot <- log2(cpm_dat)
+  boxplot(data2plot, xlab = "Samples", ylab = "log2 CPM", 
+          las = 2, cex = 0.5, cex.lab = 0.5,
+          cex.axis = 0.5, main = paste0("Boxplot: HSCe RNASeq Samples - ",cap))
+  #draw the median on each box plot
+  abline(h = median(apply(data2plot, 2, median)), 
+         col = color, lwd = 2, lty = "dashed")
+}
+```
+
+```{r, warning=FALSE, fig.show="hold", out.width="50%"}
+boxplot_cpm(pre_counts, "pink", "Before Normalization")
+boxplot_cpm(normalized_counts, "blue", "After Normalization")
+```
+- The boxplots indicate that the overall pattern of distribution is similar across the samples.
+
+- We have illustrated that through our normalization, we reduce the differences between the quantiles of each sample, and the normalized medians are more consistent. 
+
+
+**2. Distribution: Density Plot**
+```{r}
+plot_density <- function(cpm_dat, cap){
+  counts_density <- apply(log2(cpm_dat), 
+                          2, density)
+  data2plot <- log2(cpm_dat)
+  #calculate the limits across all the samples
+  xlim <- 0; ylim <- 0
+  for (i in 1:length(counts_density)) {
+    xlim <- range(c(xlim, counts_density[[i]]$x)); 
+    ylim <- range(c(ylim, counts_density[[i]]$y))
+  }
+  cols <- rainbow(length(counts_density))
+  ltys <- rep(1, length(counts_density))
+  #plot the first density plot to initialize the plot
+  plot(counts_density[[1]], xlim=xlim, ylim=ylim, type="n", 
+       ylab="Smoothing density of log2-CPM", 
+       main= paste0("Density: HSCe RNASeq Samples - ",cap), cex.lab = 0.85)
+  #plot each line
+  for (i in 1:length(counts_density)) 
+    lines(counts_density[[i]], col=cols[i], lty=ltys[i])
+  #create legend
+  legend("topright", colnames(data2plot),  
+         col=cols, lty=ltys, cex=0.75, 
+         border ="blue",  text.col = "green4", 
+         merge = TRUE, bg = "gray90")
+}
+```
+
+```{r, warning=FALSE, fig.show="hold", out.width="50%"}
+plot_density(pre_counts, "Before Normalization")
+plot_density(normalized_counts, "After Normalization")
+```
+
+- Both density plots share a similar scale, and our pre- and after-normalized data show a similar distribution.
+
+- We have illustrated that after the normalization, the samples have less dispersed distributions, with less extremes and data is more concentrated in the center.
+
+From the distribution above, we show that have successfully minimized the technical variation between samples, and we are more confident that the abundance of given genes will vary because of biological variation (age).
+
+**3. MDS Plot**
+```{r}
+plotMDS(d, labels=rownames(samples),
+  col = c("darkgreen","blue")[factor(samples$age_group)])
+```
+- The multidimensional scaling plot (MDS) shows that the old and young group cluster together, where the young group samples maibly cluster together on the left-bottem of the MDS graph, and the old group samples mainly cluster on the top right. This suggests the samples from the two groups can be distinguished based on their gene expression patterns.
+
+- Interestingly, we found 3 outliers of the old group, and their genders are all women. We should be careful of the potential batch effect of gender in our future expression analysis.
+
+
+**4. Data dispersion: Mean-variance Plot**
+- , less variation in highly expressed value
+```{r}
+# Calculate dispersion
+model_design <- model.matrix(~samples$patient
+                             + samples$age_group+0)
+d <- estimateDisp(d, model_design)
+
+#plot
+plotMeanVar(d, show.raw.vars = TRUE, show.tagwise.vars=TRUE, 
+            show.ave.raw.vars = TRUE,  
+            NBline=TRUE,
+            show.binned.common.disp.vars = TRUE)
+```
+- The square value of dispersion showed on the mean-variance plot indicates that the gene expression levels of the two groups are distinct. The blue dots indicating old group samples are more concentrated around the mean variance, while the young group samples are more dispersed.
+
+
+## Identifier mapping
+
+- We will convert the emsembl ids to the hgnc gene names
+
+```{r}
+# Connect to emsembl and get human dataset
+ensembl <- useMart("ensembl")
+ensembl <- useDataset("hsapiens_gene_ensembl",mart=ensembl)
+
+# ENSG to HGNC, save
+conversion_stash <- "HSCe_id_conversion.rds"
+if(file.exists(conversion_stash)){
+  HSCe_id_conversion <- readRDS(conversion_stash)
+} else {
+  HSCe_id_conversion <- getBM(attributes = c("ensembl_gene_id","hgnc_symbol"),
+                            filters = c("ensembl_gene_id"),
+                            # remove the points
+                            values = gsub("\\..*", "", HSCe_exp_filtered$Ensembl_ID),
+                            mart = ensembl)
+  saveRDS(HSCe_id_conversion, conversion_stash)
+}
+```
+
+- We calculate the coverage:
+```{r}
+mapped <- length(which(gsub("\\..*", "",rownames(normalized_counts)) %in% 
+                HSCe_id_conversion$ensembl_gene_id))
+nrow(normalized_counts)-mapped
+
+
+# merge
+rownames(normalized_counts) <- gsub("\\..*", "",rownames(normalized_counts))
+normalized_counts_annot <- merge(HSCe_id_conversion,normalized_counts,
+                                 by.x = 1, by.y = 0, all.y=TRUE)
+# rownames(normalized_counts_annot) <-  normalized_counts_annot$ensembl_gene_id
+kable(normalized_counts_annot[1:5,],type = "html")
+```
+- Eventually, we have a final result of a dataframe with 22 columns (20 samples, 1 row for emsembl gene id, one column for HUGO symbols) with  `r mapped` mapped genes as the rows.
+
+Missing
+```{r}
+ensembl_id_missing_gene <- normalized_counts_annot$ensembl_gene_id[
+  which(is.na(normalized_counts_annot$hgnc_symbol))]
+num_missing <- length(ensembl_id_missing_gene)
+
+# what are the missing values?
+rownames(raw_dat) <- gsub("\\..*", "",raw_dat$Ensembl_ID)
+old_mapping <- merge(raw_dat[,1],data.frame(ensembl_id_missing_gene), by.x = 1, by.y = 0, all.y=TRUE)
+kable(old_mapping[1:10,], type="html")
+
+# remove missing values
+normalized_counts_annot <- normalized_counts_annot[which(!is.na(normalized_counts_annot$hgnc_symbol)),]
+```
+- There are some missing values that have a corresbonding HUGO symbol when querying manually, however, the emsembl db from biomaRT doesn't have corresponding mapping.
+
+## Interpret, and document
+- What are the control and test conditions of the dataset?
+As mentioned in [Data and Experimental Conditions], We used the 10 biological replicates from the young donors as our control group and the 10 biological replicates from the aged donors as the experimental group.
+
+- Why is the dataset of interest to you?
+Because I want to study the epigenetic mechanism of human HSC and this dataset has well-constructed controll and test groups with FACS Isolation method for sample preparation, causing minimum techenical variation.
+
+- Were there expression values that were not unique for specific genes? How did you handle these?
+No, all the expression values are unique for specific gene denoting by ensembl.
+
+- Were there expression values that could not be mapped to current HUGO symbols?
+Yes, I removed the expression values that could not be mapped to current HUGO symbols because we have a high enough coverarge.
+
+- How many outliers were removed?
+5 outliers were removed as they are researcher notes instead of real emsembl ids.
+
+- How did you handle replicates?
+I left the replicates because dispite similar HUGO symbols, they emsembl ids are different, and we cannot expect 1-to- 1 mapping between databases. Thus to maximize the information we captured, we keep the replicates.
+
+- What is the final coverage of your dataset?
+The final coverage is `r nrow(normalized_counts_annot)/nrow(raw_dat)`.
