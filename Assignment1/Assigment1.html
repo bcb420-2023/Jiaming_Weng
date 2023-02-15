@@ -1873,7 +1873,7 @@ if(file.exists(conversion_stash)){
 <pre class="r"><code>mapped &lt;- length(which(gsub(&quot;\\..*&quot;, &quot;&quot;,rownames(normalized_counts)) %in% 
                 HSCe_id_conversion$ensembl_gene_id))
 nrow(normalized_counts)-mapped</code></pre>
-<pre><code>## [1] 1875</code></pre>
+<pre><code>## [1] 430</code></pre>
 <pre class="r"><code># merge
 rownames(normalized_counts) &lt;- gsub(&quot;\\..*&quot;, &quot;&quot;,rownames(normalized_counts))
 normalized_counts_annot &lt;- merge(HSCe_id_conversion,normalized_counts,
@@ -2057,7 +2057,7 @@ kable(normalized_counts_annot[1:5,],type = &quot;html&quot;)</code></pre>
 <ul>
 <li>Eventually, we have a final result of a dataframe with 22 columns
 (20 samples, 1 row for emsembl gene id, one column for HUGO symbols)
-with 12508 mapped genes as the rows.</li>
+with 13953 mapped genes as the rows.</li>
 </ul>
 <p>Missing</p>
 <pre class="r"><code>ensembl_id_missing_gene &lt;- normalized_counts_annot$ensembl_gene_id[
@@ -2078,48 +2078,46 @@ kable(old_mapping[1:10,], type=&quot;html&quot;)</code></pre>
 <tbody>
 <tr class="odd">
 <td align="left">1</td>
-<td align="left">ENSG00000001630</td>
+<td align="left">ENSG00000005955</td>
 </tr>
 <tr class="even">
 <td align="left">10</td>
-<td align="left">ENSG00000018280</td>
+<td align="left">ENSG00000108270</td>
 </tr>
 <tr class="odd">
 <td align="left">100</td>
-<td align="left">ENSG00000106336</td>
+<td align="left">ENSG00000184825</td>
 </tr>
 <tr class="even">
-<td align="left">1000</td>
-<td align="left">ENSG00000228828</td>
+<td align="left">101</td>
+<td align="left">ENSG00000184886</td>
 </tr>
 <tr class="odd">
-<td align="left">1001</td>
-<td align="left">ENSG00000228887</td>
+<td align="left">102</td>
+<td align="left">ENSG00000185128</td>
 </tr>
 <tr class="even">
-<td align="left">1002</td>
-<td align="left">ENSG00000228889</td>
+<td align="left">103</td>
+<td align="left">ENSG00000185928</td>
 </tr>
 <tr class="odd">
-<td align="left">1003</td>
-<td align="left">ENSG00000228906</td>
+<td align="left">104</td>
+<td align="left">ENSG00000186275</td>
 </tr>
 <tr class="even">
-<td align="left">1004</td>
-<td align="left">ENSG00000228981</td>
+<td align="left">105</td>
+<td align="left">ENSG00000186530</td>
 </tr>
 <tr class="odd">
-<td align="left">1005</td>
-<td align="left">ENSG00000228989</td>
+<td align="left">106</td>
+<td align="left">ENSG00000187145</td>
 </tr>
 <tr class="even">
-<td align="left">1006</td>
-<td align="left">ENSG00000229132</td>
+<td align="left">107</td>
+<td align="left">ENSG00000187667</td>
 </tr>
 </tbody>
 </table>
-<pre class="r"><code># remove missing values
-normalized_counts_annot &lt;- normalized_counts_annot[which(!is.na(normalized_counts_annot$hgnc_symbol)),]</code></pre>
 <ul>
 <li>There are some missing values that have a corresbonding HUGO symbol
 when querying manually, however, the emsembl db from biomaRT doesn’t
@@ -2152,7 +2150,7 @@ dispite similar HUGO symbols, they emsembl ids are different, and we
 cannot expect 1-to- 1 mapping between databases. Thus to maximize the
 information we captured, we keep the replicates.</p></li>
 <li><p>What is the final coverage of your dataset? The final coverage is
-0.2184613.</p></li>
+0.2512095.</p></li>
 </ul>
 <div id="refs" class="references csl-bib-body hanging-indent">
 <div id="ref-adelman_aging_2019" class="csl-entry">

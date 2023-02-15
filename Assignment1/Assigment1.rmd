@@ -350,9 +350,6 @@ num_missing <- length(ensembl_id_missing_gene)
 rownames(raw_dat) <- gsub("\\..*", "",raw_dat$Ensembl_ID)
 old_mapping <- merge(raw_dat[,1],data.frame(ensembl_id_missing_gene), by.x = 1, by.y = 0, all.y=TRUE)
 kable(old_mapping[1:10,], type="html")
-
-# remove missing values
-normalized_counts_annot <- normalized_counts_annot[which(!is.na(normalized_counts_annot$hgnc_symbol)),]
 ```
 - There are some missing values that have a corresbonding HUGO symbol when querying manually, however, the emsembl db from biomaRT doesn't have corresponding mapping.
 
