@@ -17,7 +17,7 @@ bibliography: Assignment2.bib
 
 ## Introduction
 
-- Aged hematopoietic stem cells (HSC) display functional decline and associated with an increased risk of myeloid malignancies [@beerman2013proliferation]. To investigate the genomic mechanism of the epigenetic differences in aged HSCe, in our first assignment, we selected an GEO dataset from Adelman et al. (accession number [GSE104406](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE104406)), that is an RNA-sequencing (RNA-seq) profiles of 10 young and 10 aged Lineage−CD34+CD38− cells [HSC-enriched (HSCe)] samples [@adelman_aging_2019].
+- Aged hematopoietic stem cells (HSC) display functional decline and associated with an increased risk of myeloid malignancies [@beerman_proliferation-dependent_2013]. To investigate the genomic mechanism of the epigenetic differences in aged HSCe, in our first assignment, we selected an GEO dataset from Adelman et al. (accession number [GSE104406](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE104406)), that is an RNA-sequencing (RNA-seq) profiles of 10 young and 10 aged Lineage−CD34+CD38− cells [HSC-enriched (HSCe)] samples [@adelman_aging_2019].
   -  Each sample will have `age_group`, `patient`, and `age` attribute:
     * `age_group` denotes the age group of the sample donor.
     * `patient` is an unique id.
@@ -25,10 +25,10 @@ bibliography: Assignment2.bib
 - In our first assignment, we performed data cleaning, normalization, mapped HUGO symbols, and analysed the result.
 
   * For purpose of quality control, genes with low counts (less then 1 count per million) and non integer gene counts are removed, left with total of 14383 genes.
-  * Then, TMM(weighted trimmed mean of M-values) in [edgeR](https://bioconductor.org/packages/release/bioc/html/edgeR.html) package was used to normalize the gene counts. [@robinson2010edger] The distribution is more concentrated, with less extremes, and more consistent accross the samples.
-  * Eventually 13207 Emsembl gene ids from the original dataset are successfully mapped HUGO gene symbols using [biomaRt](https://bioconductor.org/packages/release/bioc/html/biomaRt.html) package. [@durinck2009mapping] After removing lower counts and genes that cannot be mapped to HUGO symbols.
+  * Then, TMM(weighted trimmed mean of M-values) in [edgeR](https://bioconductor.org/packages/release/bioc/html/edgeR.html) package was used to normalize the gene counts. The distribution is more concentrated, with less extremes, and more consistent accross the samples.
+  * Eventually 13207 Emsembl gene ids from the original dataset are successfully mapped HUGO gene symbols using [biomaRt](https://bioconductor.org/packages/release/bioc/html/biomaRt.html) package. After removing lower counts and genes that cannot be mapped to HUGO symbols.
   * After the normalization, multidimensional scaling plot (MDS) shows that the separated clusters of old and young group, suggesting the samples from the two groups can be distinguished based on their gene expression patterns.
-```{r}
+```{r MDS, fig.cap="\\label{fig:MDS}Figure 1. Multidimensional Scaling (MDS) plot with age group coloring, with the clustering of samples based on gene expression data."}
 knitr::include_graphics("A2_data/MDS_A1.png")
 ```
 
@@ -86,6 +86,12 @@ library(ComplexHeatmap)
 library(circlize)
 library(gprofiler2)
 ```
+- edgeR:  [@robinson2010edger]
+- ggplot2: [@wickham2007ggplot]
+- ComplexHeatmap: [@gu2016complex]
+- circlize: [@gu2014circlize]
+- EnhancedVolcano: [@blighe2020enhancedvolcano]
+- gprofiler2: [@kolberg2020gprofiler2]
 
 ### load data
 
@@ -245,7 +251,7 @@ kable(output_hits[1:10,2:8],type="html",row.names = FALSE)
 
 - We use EnhancedVolcano package to make the Volcano plot, that visualizes the differential gene expression coloring not differentially expressed genes as grey, color the up-regulated genes with logFC passed the p-value threshold as pink, the down-regulated genes with logFC passed the p-value threshold as blue.
 
-```{r, warning = F}
+```{r volcano, fig.cap="\\label{fig:volcano}Figure 2. Volcano plot for the top differentially expressed genes passed 0.05 P-value threshold and with absolute Log fold change greater 1. The top hits labeled with the corresponding HUGO gene symbels.", warning = F}
 volcano_obj <- data.frame(
     "HGNC_Symbol" = output_hits$hgnc_symbol,
     "logFC" = output_hits$logFC,
@@ -298,12 +304,11 @@ current_heatmap <- Heatmap(as.matrix(heatmap_matrix),
       show_row_names = FALSE,show_heatmap_legend = TRUE)
 ```
 
-```{r}
+```{r heatmap, fig.cap="\\label{fig:heatmap}Figure 3. Heatmap for the top differentially expressed genes passed 0.05 P-value threshold. There are clearly clusters on both up and down regulated genesclearly cluster on both up and down regulated genes"}
 current_heatmap
 ```
 
-- The heat map shows clearly cluster on both up and down regulated genes in the age groups, which suggests differentially expressed genes.
-
+- The heat map shows clearly cluster on both distinct up and down regulated genes in different age groups with a reverse trend, which suggests differentially expressed genes. 
 
 ## Thresholded over-representation analysis
 
@@ -315,7 +320,7 @@ current_heatmap
 
 - The top 10 up-regulated genes are seleced
 
-```{r}
+```{r up_gostplot, fig.cap="\\label{fig:up_gostplot}Figure 4. Dot plot for up-regulated thresholded gene list, where top significant pathways that were identified in multiple databases."}
 up_hits <- output_hits$hgnc_symbol[output_hits$adj.P.Val < 0.05 & output_hits$logFC > 1]
 gostres <- gost(query = up_hits, 
                 organism = "hsapiens", 
@@ -340,7 +345,7 @@ sum(bp$significant==TRUE)
 
 - We use a dot plot from ggplot2 to visualize the result of the enrichment analysis.
 
-```{r}
+```{r up_dot, fig.cap="\\label{fig:up_gostplot}Figure 5. Dot plot for top 10 up-regulated thresholded gene list, where top 10 significant pathways that were identified in GO:BP."}
 ggplot(bp[1:10,]) + 
   geom_point(aes(
     x = precision, 
@@ -353,15 +358,19 @@ ggplot(bp[1:10,]) +
   labs(x = "Perciesion",
        color = "P-value", 
        size = "Intersected genes", 
-       y = NULL)
+       y = NULL,
+       title = "Enrichment analsis on all up-regulated genes")
 ```
+
 - The result of the enrichment analysis shows a enrichment in the biosynthetic pathways, which is expected as we are investigating the impact of age on the genomic functions of HSCe.The up-regulated expression of biosynthetic-process related genes verifies that the factor age may contribute to increased risk of myeloid malignancies.
+
+- Interestingly, research shows that histone modifications can impact RNA polymerase pathways by either promoting or inhibiting transcription, because histone modifications play an essential role in regulating gene expression by controlling access to the underlying DNA. [@tanny_chromatin_2015]
 
 ### Down-regulated genes
 
 - The top down-regulated genes are seleced
 
-```{r}
+```{r down_gostplot, fig.cap="\\label{fig:down_gostplot}Figure 6. Dot plot for down-regulated thresholded gene list, where top significant pathways that were identified in multiple databases."}
 down_list <- output_hits$hgnc_symbol[output_hits$adj.P.Val < 0.05 & output_hits$logFC < -1]
 gostres <- gost(query = down_list,
                 organism = "hsapiens", 
@@ -386,7 +395,7 @@ sum(bp_down$significant==TRUE)
 
 - We use a dot plot from ggplot2 to visualize the result of the enrichment analysis.
 
-```{r}
+```{r down_dot, fig.cap="\\label{fig:down_gostplot}Figure 5. Dot plot for top 10 down-regulated thresholded gene list, where top 10 significant pathways that were identified in GO:BP."}
 ggplot(bp_down[1:10,]) + 
   geom_point(aes(
     x = precision, 
@@ -399,7 +408,8 @@ ggplot(bp_down[1:10,]) +
   labs(x = "Perciesion",
        color = "P-value", 
        size = "Intersected genes", 
-       y = NULL)
+       y = NULL,
+       title = "Enrichment analsis on all down-regulated genes")
 ```
 - The result of the enrichment analysis on the down-regulated genes shows a enrichment in the metabolic pathways, which is expected as we are investigating the impact of age on the genomic functions of HSCe.The down-regulated expression of metabolic-process related genes again verifies that the factor age may contribute to increased risk of myeloid malignancies.
 
@@ -407,7 +417,7 @@ ggplot(bp_down[1:10,]) +
 
 - The top hit genes are seleced
 
-```{r}
+```{r all_gostplot, fig.cap="\\label{fig:all_gostplot}Figure 8. Dot plot for all thresholded gene list, where top significant pathways that were identified in multiple databases."}
 gostres_all <- gost(query = top_hits,
                 organism = "hsapiens", 
                 ordered_query = FALSE, 
@@ -431,7 +441,7 @@ sum(bp_all$significant==TRUE)
 
 - We use a dot plot from ggplot2 to visualize the result of the enrichment analysis.
 
-```{r}
+```{r all_dot, fig.cap="\\label{fig:all_gostplot}Figure 5. Dot plot for top 10 thresholded gene list, where top 10 significant pathways that were identified in GO:BP."}
 ggplot(bp_all[1:10,]) + 
   geom_point(aes(
     x = precision, 
@@ -444,7 +454,8 @@ ggplot(bp_all[1:10,]) +
   labs(x = "Perciesion",
        color = "P-value", 
        size = "Intersected genes", 
-       y = NULL)
+       y = NULL,
+       title = "Enrichment analsis on all top hits")
 ```
 
 - The result of the enrichment analysis on the all genes still shows a enrichment in the metabolic pathways, which is consistent with the result of down-regulated gene expression of metabolic-process, with 2 biosynthetic-relayed pathways from the result of up-regulated genes included.
@@ -489,7 +500,8 @@ How many genesets were returned with what thresholds?**
 
 **1. Do the over-representation results support conclusions or mechanism discussed in the original paper?**
 
-- The overall-representation results supports the conclusion.
+- The overall-representation results supports the conclusion in the original paper. They suggest that aging has been shown to have significant effects on the epigenome, with consistent changes observed across different individuals. These changes impact both cytosine and histone modifications and affect critical developmental and cancer pathways. [@adelman_aging_2019] As our results from differential gene expression, genes are differentially expressed between aged and young group, and enrichment analysis shows that the top differentially expressed genes are related with developmental pathways like metabolic and biosynthetic pathway; and RNA polymerase II pathways shown to be related with histone modifications.
 
-Can you find evidence, i.e. publications, to support some of the results that you see. How does this evidence support your results.
-- Yes I do.
+**2. Can you find evidence, i.e. publications, to support some of the results that you see. How does this evidence support your results.**
+
+- Yes, as suggested by the reseach of Nakamura-Ishizu et al., during aging, hematopoietic stem cells (HSCs) undergo a transition through multiple hematopoietic sites, which necessitates significant metabolic changes. This suggests that HSCs have the ability to meet the physiological demands of hematopoiesis. Which is consistent with our result that the enrichment analysis gives majorly metabolic pathways. [@nakamura-ishizu_hematopoietic_2020]
