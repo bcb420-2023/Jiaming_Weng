@@ -6,3 +6,4 @@ Here are some links to the assignments and homeworks:
 - Homwork assignments:
   - [Annotation Resource KEGG](https://github.com/bcb420-2023/Jiaming_Weng/wiki/Annotation-Resource-KEGG)
   - [G:Profiler](https://github.com/bcb420-2023/Jiaming_Weng/wiki/G:Profiler)
+- [Assignment 2](https://github.com/bcb420-2023/Jiaming_Weng/tree/main/Assignment2)
