@@ -8,3 +8,4 @@ Here are some links to the assignments and homeworks:
   - [G:Profiler](https://github.com/bcb420-2023/Jiaming_Weng/wiki/G:Profiler)
   - [GSEA](https://github.com/bcb420-2023/Jiaming_Weng/wiki/GSEA)
 - [Assignment 2](https://github.com/bcb420-2023/Jiaming_Weng/tree/main/Assignment2)
+- [Assignment 3](https://github.com/bcb420-2023/Jiaming_Weng/tree/main/Assignment3)
